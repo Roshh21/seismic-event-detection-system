@@ -68,7 +68,7 @@ The system is designed as a complete earthquake monitoring pipeline:
 # Project Structure
 
 ```bash
-EQ-DETECTION-1/
+seismic-event-detection-system
 │
 ├── alerts/
 │   └── alert_engine.py
