@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Earthquake Early Warning System — Dashboard</title>
+ 
+  <!-- Leaflet.js -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+ 
+  <!-- Chart.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+ 
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500&display=swap');
+ 
+    :root {
+      --bg-deep:    #070b14;
+      --bg-panel:   #0d1526;
+      --bg-card:    #111d33;
+      --border:     #1e3a5f;
+      --accent:     #00d4ff;
+      --accent2:    #00ffaa;
+      --warn:       #f5a623;
+      --danger:     #e74c3c;
+      --success:    #2ecc71;
+      --text:       #c8d8f0;
+      --text-dim:   #5a7499;
+      --glow:       0 0 20px rgba(0,212,255,0.3);
+      --glow-warn:  0 0 20px rgba(245,166,35,0.4);
+      --glow-danger:0 0 20px rgba(231,76,60,0.5);
+    }
+ 
+    * { margin:0; padding:0; box-sizing:border-box; }
+ 
+    body {
+      background: var(--bg-deep);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+ 
+    /* ── Header ────────────────────────────────────────── */
+    header {
+      background: linear-gradient(90deg, #050d1a 0%, #0d1a3a 50%, #050d1a 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      position: relative;
+      overflow: hidden;
+    }
+    header::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 80px,
+        rgba(0,212,255,0.02) 80px,
+        rgba(0,212,255,0.02) 81px
+      );
+    }
+ 
+    .logo {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 8px;
+      display: grid; place-items: center;
+      font-size: 20px;
+      box-shadow: var(--glow);
+    }
+    .logo-text {
+      font-family: 'Orbitron', monospace;
+      font-weight: 900;
+      font-size: 14px;
+      letter-spacing: 2px;
+      color: var(--accent);
+      text-shadow: var(--glow);
+    }
+    .logo-sub {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px;
+      color: var(--text-dim);
+      letter-spacing: 3px;
+      margin-top: 1px;
+    }
+ 
+    .header-right {
+      display: flex; align-items: center; gap: 20px;
+    }
+    .live-badge {
+      display: flex; align-items: center; gap: 6px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--success);
+    }
+    .live-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--success);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity:1; transform:scale(1); }
+      50%      { opacity:0.4; transform:scale(0.8); }
+    }
+ 
+    .clock {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+ 
+    /* ── Layout ────────────────────────────────────────── */
+    .layout {
+      display: grid;
+      grid-template-columns: 340px 1fr 300px;
+      grid-template-rows: 1fr;
+      flex: 1;
+      overflow: hidden;
+      gap: 0;
+    }
+ 
+    /* ── Panels ─────────────────────────────────────────── */
+    .panel {
+      background: var(--bg-panel);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+    .panel:last-child { border-right: none; border-left: 1px solid var(--border); }
+ 
+    /* custom scrollbar */
+    .panel::-webkit-scrollbar { width: 4px; }
+    .panel::-webkit-scrollbar-track { background: transparent; }
+    .panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+ 
+    /* ── Section headers ─────────────────────────────────── */
+    .section-head {
+      padding: 12px 16px 8px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 3px;
+      color: var(--text-dim);
+      border-bottom: 1px solid var(--border);
+      text-transform: uppercase;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .section-head::before {
+      content: '';
+      width: 3px; height: 12px;
+      background: var(--accent);
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+ 
+    /* ── Alert Banner ─────────────────────────────────────── */
+    #alert-banner {
+      margin: 12px;
+      border-radius: 8px;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      position: relative;
+      overflow: hidden;
+      transition: all 0.4s;
+    }
+    #alert-banner.LOW      { border-color: var(--success); box-shadow: 0 0 16px rgba(46,204,113,0.2); }
+    #alert-banner.MODERATE { border-color: var(--warn);    box-shadow: var(--glow-warn); }
+    #alert-banner.HIGH     {
+      border-color: var(--danger);
+      box-shadow: var(--glow-danger);
+      animation: alertPulse 1s ease-in-out infinite;
+    }
+    @keyframes alertPulse {
+      0%,100% { box-shadow: 0 0 16px rgba(231,76,60,0.4); }
+      50%      { box-shadow: 0 0 36px rgba(231,76,60,0.8); }
+    }
+ 
+    .alert-level {
+      font-family: 'Orbitron', monospace;
+      font-weight: 900;
+      font-size: 22px;
+      letter-spacing: 3px;
+    }
+    .alert-level.LOW      { color: var(--success); }
+    .alert-level.MODERATE { color: var(--warn); }
+    .alert-level.HIGH     { color: var(--danger); }
+ 
+    .alert-icon {
+      font-size: 28px;
+      float: right;
+    }
+ 
+    .alert-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+    }
+ 
+    /* ── Metric Cards ─────────────────────────────────────── */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      padding: 10px 12px;
+    }
+    .metric-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      position: relative;
+    }
+    .metric-card::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: var(--accent);
+      border-radius: 6px 6px 0 0;
+    }
+    .metric-card.warn::after  { background: var(--warn); }
+    .metric-card.danger::after{ background: var(--danger); }
+    .metric-card.ok::after    { background: var(--success); }
+ 
+    .metric-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 8px;
+      letter-spacing: 2px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .metric-value {
+      font-family: 'Orbitron', monospace;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .metric-unit {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+ 
+    /* ── Impact Radii ─────────────────────────────────────── */
+    .radii-list {
+      padding: 8px 12px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .radius-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+    }
+    .radius-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .radius-bar {
+      flex: 1;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .radius-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.8s ease;
+    }
+    .radius-km {
+      color: var(--text-dim);
+      width: 60px;
+      text-align: right;
+    }
+ 
+    /* ── Action List ──────────────────────────────────────── */
+    .actions-list {
+      padding: 8px 12px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .action-item {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+      font-size: 11px;
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .action-bullet {
+      color: var(--accent);
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+ 
+    /* ── Map ──────────────────────────────────────────────── */
+    #map {
+      width: 100%;
+      height: 100%;
+      background: #050d1a;
+    }
+    .leaflet-container {
+      background: #050d1a !important;
+      font-family: 'Share Tech Mono', monospace !important;
+    }
+ 
+    /* ── Right Panel ──────────────────────────────────────── */
+    .chart-container {
+      padding: 12px;
+      position: relative;
+    }
+    .chart-container canvas {
+      max-height: 160px;
+    }
+ 
+    /* ── History Table ─────────────────────────────────────── */
+    .history-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+    }
+    .history-table th {
+      padding: 6px 10px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+    .history-table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid rgba(30,58,95,0.4);
+      color: var(--text);
+    }
+    .history-table tr:hover td {
+      background: rgba(0,212,255,0.04);
+      cursor: pointer;
+    }
+    .level-badge {
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-size: 9px;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+    .level-badge.LOW      { background: rgba(46,204,113,0.15); color: var(--success); }
+    .level-badge.MODERATE { background: rgba(245,166,35,0.15); color: var(--warn); }
+    .level-badge.HIGH     { background: rgba(231,76,60,0.15);  color: var(--danger); }
+ 
+    /* ── Load Button ───────────────────────────────────────── */
+    .load-area {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .btn {
+      width: 100%;
+      padding: 10px;
+      background: linear-gradient(135deg, rgba(0,212,255,0.1), rgba(0,212,255,0.05));
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      color: var(--accent);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 2px;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: all 0.2s;
+    }
+    .btn:hover {
+      background: rgba(0,212,255,0.15);
+      box-shadow: var(--glow);
+    }
+    .btn-demo {
+      border-color: var(--accent2);
+      color: var(--accent2);
+      background: linear-gradient(135deg, rgba(0,255,170,0.08), rgba(0,255,170,0.03));
+    }
+    .btn-demo:hover {
+      background: rgba(0,255,170,0.12);
+      box-shadow: 0 0 16px rgba(0,255,170,0.3);
+    }
+ 
+    .status-line {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px;
+      color: var(--text-dim);
+      text-align: center;
+      letter-spacing: 1px;
+    }
+ 
+    /* ── Waveform mini-viz ─────────────────────────────────── */
+    #waveform-canvas {
+      width: 100%;
+      height: 80px;
+      margin: 0;
+      display: block;
+    }
+ 
+    /* ── Scan line overlay ─────────────────────────────────── */
+    .scanlines {
+      pointer-events: none;
+      position: fixed; inset: 0;
+      background: repeating-linear-gradient(
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.03) 2px,
+        rgba(0,0,0,0.03) 4px
+      );
+      z-index: 9999;
+    }
+  </style>
+</head>
+<body>
+  <div class="scanlines"></div>
+ 
+  <!-- ── Header ─────────────────────────────────────────── -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🌍</div>
+      <div>
+        <div class="logo-text">EWS · SEISMIC</div>
+        <div class="logo-sub">EARTHQUAKE EARLY WARNING SYSTEM</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="live-badge">
+        <div class="live-dot"></div>
+        MONITORING
+      </div>
+      <div class="clock" id="clock">--:--:-- UTC</div>
+    </div>
+  </header>
+ 
+  <!-- ── Main Layout ─────────────────────────────────────── -->
+  <div class="layout">
+ 
+    <!-- ══ LEFT PANEL ══════════════════════════════════════ -->
+    <div class="panel">
+ 
+      <!-- Load Controls -->
+      <div class="section-head">Data Input</div>
+      <div class="load-area">
+        <button class="btn" onclick="loadPredictionsJSON()">⬆ Load predictions.json</button>
+        <button class="btn btn-demo" onclick="loadDemoData()">⚡ Load Demo Event</button>
+        <div class="status-line" id="load-status">No data loaded</div>
+      </div>
+ 
+      <!-- Alert Banner -->
+      <div class="section-head">Alert Status</div>
+      <div id="alert-banner" class="LOW">
+        <div class="alert-label">RISK LEVEL</div>
+        <span class="alert-icon" id="alert-icon">🔵</span>
+        <div class="alert-level LOW" id="alert-level">STANDBY</div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-dim);margin-top:6px;" id="alert-time">—</div>
+      </div>
+ 
+      <!-- Metrics -->
+      <div class="section-head">Predictions</div>
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-label">Detection</div>
+          <div class="metric-value" id="m-det">—</div>
+          <div class="metric-unit">P(earthquake)</div>
+        </div>
+        <div class="metric-card warn">
+          <div class="metric-label">Magnitude</div>
+          <div class="metric-value" id="m-mag" style="color:var(--warn)">—</div>
+          <div class="metric-unit">Richter</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Latitude</div>
+          <div class="metric-value" id="m-lat" style="font-size:15px">—</div>
+          <div class="metric-unit">degrees</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Longitude</div>
+          <div class="metric-value" id="m-lon" style="font-size:15px">—</div>
+          <div class="metric-unit">degrees</div>
+        </div>
+        <div class="metric-card ok" style="grid-column:1/-1">
+          <div class="metric-label">Depth</div>
+          <div class="metric-value" id="m-depth" style="color:var(--success)">—</div>
+          <div class="metric-unit">km below surface</div>
+        </div>
+      </div>
+ 
+      <!-- Impact Radii -->
+      <div class="section-head">Impact Radii</div>
+      <div class="radii-list">
+        <div class="radius-row">
+          <div class="radius-dot" style="background:var(--danger)"></div>
+          <span style="width:60px;color:var(--text-dim)">High</span>
+          <div class="radius-bar"><div class="radius-fill" id="r-high" style="width:0%;background:var(--danger)"></div></div>
+          <div class="radius-km" id="rv-high">— km</div>
+        </div>
+        <div class="radius-row">
+          <div class="radius-dot" style="background:var(--warn)"></div>
+          <span style="width:60px;color:var(--text-dim)">Moderate</span>
+          <div class="radius-bar"><div class="radius-fill" id="r-moderate" style="width:0%;background:var(--warn)"></div></div>
+          <div class="radius-km" id="rv-moderate">— km</div>
+        </div>
+        <div class="radius-row">
+          <div class="radius-dot" style="background:var(--success)"></div>
+          <span style="width:60px;color:var(--text-dim)">Low</span>
+          <div class="radius-bar"><div class="radius-fill" id="r-low" style="width:0%;background:var(--success)"></div></div>
+          <div class="radius-km" id="rv-low">— km</div>
+        </div>
+      </div>
+ 
+      <!-- Actions -->
+      <div class="section-head">Recommended Actions</div>
+      <div class="actions-list" id="actions-list">
+        <div class="action-item" style="color:var(--text-dim)">
+          <span class="action-bullet">›</span>
+          Load prediction data to see recommendations
+        </div>
+      </div>
+ 
+    </div>
+ 
+    <!-- ══ CENTER: MAP ══════════════════════════════════════ -->
+    <div id="map"></div>
+ 
+    <!-- ══ RIGHT PANEL ════════════════════════════════════ -->
+    <div class="panel">
+ 
+      <!-- Waveform Preview -->
+      <div class="section-head">Seismic Waveform Preview</div>
+      <div style="padding:10px 12px;">
+        <canvas id="waveform-canvas"></canvas>
+        <div style="display:flex;justify-content:space-between;font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--text-dim);margin-top:4px;">
+          <span>E component</span><span>N component</span><span>Z component</span>
+        </div>
+      </div>
+ 
+      <!-- Magnitude Chart -->
+      <div class="section-head">Magnitude Distribution</div>
+      <div class="chart-container">
+        <canvas id="mag-chart"></canvas>
+      </div>
+ 
+      <!-- History Table -->
+      <div class="section-head">Event History</div>
+      <div style="padding:8px 0;">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Mag</th>
+              <th>Risk</th>
+            </tr>
+          </thead>
+          <tbody id="history-body">
+            <tr>
+              <td colspan="3" style="color:var(--text-dim);text-align:center;padding:16px;">
+                No events yet
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+ 
+    </div>
+  </div>
+ 
+  <script>
+  // ── Clock ──────────────────────────────────────────────
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('clock').textContent =
+      now.toUTCString().slice(17, 25) + ' UTC';
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+ 
+  // ── Map init ───────────────────────────────────────────
+  const map = L.map('map', {
+    center: [20, 0],
+    zoom: 2,
+    zoomControl: true,
+  });
+ 
+  // Dark tile layer
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; CartoDB',
+    maxZoom: 18,
+  }).addTo(map);
+ 
+  let epicenterMarker = null;
+  let impactCircles   = [];
+  const eventHistory  = [];
+ 
+  // ── Charts ─────────────────────────────────────────────
+  const magCtx = document.getElementById('mag-chart').getContext('2d');
+  const magChart = new Chart(magCtx, {
+    type: 'bar',
+    data: {
+      labels: ['<2','2-3','3-4','4-5','5-6','6-7','>7'],
+      datasets: [{
+        label: 'Events',
+        data: [0,0,0,0,0,0,0],
+        backgroundColor: [
+          'rgba(46,204,113,0.5)','rgba(46,204,113,0.5)',
+          'rgba(46,204,113,0.5)','rgba(245,166,35,0.5)',
+          'rgba(245,166,35,0.5)','rgba(231,76,60,0.5)',
+          'rgba(231,76,60,0.7)',
+        ],
+        borderColor: 'transparent',
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: {
+          ticks: { color:'#5a7499', font:{family:'Share Tech Mono',size:9} },
+          grid:  { color:'rgba(30,58,95,0.4)' },
+        },
+        y: {
+          ticks: { color:'#5a7499', font:{family:'Share Tech Mono',size:9} },
+          grid:  { color:'rgba(30,58,95,0.4)' },
+          beginAtZero: true,
+        }
+      }
+    }
+  });
+ 
+  const magBins = [0,0,0,0,0,0,0];
+  function getMagBin(m) {
+    if(m<2) return 0; if(m<3) return 1; if(m<4) return 2;
+    if(m<5) return 3; if(m<6) return 4; if(m<7) return 5; return 6;
+  }
+ 
+  // ── Waveform synthetic preview ─────────────────────────
+  function drawWaveformPreview(magnitude) {
+    const canvas = document.getElementById('waveform-canvas');
+    const ctx    = canvas.getContext('2d');
+    canvas.width  = canvas.offsetWidth * 2;
+    canvas.height = 160;
+    ctx.scale(2, 1);
+    const W = canvas.offsetWidth / 2;
+    const H = 80;
+ 
+    ctx.fillStyle = '#0d1526';
+    ctx.fillRect(0, 0, W, H);
+ 
+    const colors = ['#00d4ff','#00ffaa','#f5a623'];
+    const amp    = Math.min(1, (magnitude || 3) / 8);
+    const noise  = 0.05;
+ 
+    colors.forEach((clr, ch) => {
+      ctx.beginPath();
+      ctx.strokeStyle = clr;
+      ctx.lineWidth   = 0.8;
+      ctx.globalAlpha = 0.85;
+ 
+      const offset = (ch - 1) * (H / 3.5);
+      const center = H / 2 + offset;
+      const p_onset = Math.floor(W * 0.35);
+ 
+      for(let x = 0; x < W; x++) {
+        const t = x / W;
+        let y = (Math.random() - 0.5) * noise * H;
+        if(x > p_onset) {
+          const dt = (x - p_onset) / W;
+          y += Math.sin(2 * Math.PI * 5 * dt * 4 + ch) *
+               amp * H * 0.3 * Math.exp(-dt * 6);
+        }
+        if(x === 0) ctx.moveTo(x, center + y);
+        else        ctx.lineTo(x, center + y);
+      }
+      ctx.stroke();
+ 
+      // P marker
+      if(ch === 0) {
+        ctx.globalAlpha = 0.7;
+        ctx.strokeStyle = '#f5a623';
+        ctx.lineWidth   = 1;
+        ctx.setLineDash([3,3]);
+        ctx.beginPath();
+        ctx.moveTo(p_onset, 4); ctx.lineTo(p_onset, H - 4);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#f5a623';
+        ctx.font = '8px Share Tech Mono';
+        ctx.fillText('P', p_onset + 2, 12);
+      }
+    });
+    ctx.globalAlpha = 1;
+  }
+  drawWaveformPreview(3);
+ 
+  // ── Update UI with prediction data ─────────────────────
+  function updateDashboard(data) {
+    const level  = data.risk_level || 'LOW';
+    const mag    = parseFloat(data.magnitude || 0);
+    const lat    = parseFloat(data.latitude  || 0);
+    const lon    = parseFloat(data.longitude || 0);
+    const depth  = parseFloat(data.depth_km  || 0);
+    const prob   = parseFloat(data.detection_prob || 0);
+    const radii  = data.impact_radii || {};
+    const ts     = data.timestamp ? data.timestamp.replace('T',' ').replace('Z',' UTC') : '—';
+ 
+    // Alert banner
+    const banner = document.getElementById('alert-banner');
+    banner.className = level;
+    const levelEl = document.getElementById('alert-level');
+    levelEl.className = `alert-level ${level}`;
+    levelEl.textContent = level;
+    document.getElementById('alert-icon').textContent =
+      ({LOW:'🟢',MODERATE:'🟡',HIGH:'🔴'})[level] || '🔵';
+    document.getElementById('alert-time').textContent = ts;
+ 
+    // Metrics
+    document.getElementById('m-det').textContent   = (prob * 100).toFixed(1) + '%';
+    document.getElementById('m-mag').textContent   = mag.toFixed(2);
+    document.getElementById('m-lat').textContent   = lat.toFixed(4) + '°';
+    document.getElementById('m-lon').textContent   = lon.toFixed(4) + '°';
+    document.getElementById('m-depth').textContent = depth.toFixed(1);
+ 
+    // Impact radii bars (max reference 1200 km)
+    const maxR = 1200;
+    ['high','moderate','low'].forEach(zone => {
+      const r = radii[zone] || 0;
+      document.getElementById(`r-${zone}`).style.width  = Math.min(100, r / maxR * 100) + '%';
+      document.getElementById(`rv-${zone}`).textContent = r + ' km';
+    });
+ 
+    // Actions
+    const actionsList = document.getElementById('actions-list');
+    actionsList.innerHTML = '';
+    (data.actions || ['No actions specified']).forEach(a => {
+      actionsList.innerHTML += `
+        <div class="action-item">
+          <span class="action-bullet">›</span>
+          <span>${a}</span>
+        </div>`;
+    });
+ 
+    // Map
+    updateMap(lat, lon, mag, radii, level);
+ 
+    // Waveform preview
+    drawWaveformPreview(mag);
+ 
+    // History
+    const timeStr = new Date().toUTCString().slice(17, 25);
+    eventHistory.unshift({ time: timeStr, mag: mag.toFixed(1), level });
+    renderHistory();
+ 
+    // Magnitude chart
+    magBins[getMagBin(mag)]++;
+    magChart.data.datasets[0].data = [...magBins];
+    magChart.update('none');
+ 
+    document.getElementById('load-status').textContent = `Last update: ${timeStr} UTC`;
+  }
+ 
+  function updateMap(lat, lon, mag, radii, level) {
+    // Remove old
+    if(epicenterMarker) map.removeLayer(epicenterMarker);
+    impactCircles.forEach(c => map.removeLayer(c));
+    impactCircles = [];
+ 
+    const colorMap = { high:'#e74c3c', moderate:'#f5a623', low:'#2ecc71' };
+    const levelColor = { LOW:'#2ecc71', MODERATE:'#f5a623', HIGH:'#e74c3c' }[level] || '#00d4ff';
+ 
+    // Impact circles (outside → inside)
+    ['low','moderate','high'].forEach(zone => {
+      const r = (radii[zone] || 0) * 1000; // metres
+      if(r <= 0) return;
+      const c = L.circle([lat, lon], {
+        radius: r,
+        color:       colorMap[zone],
+        fillColor:   colorMap[zone],
+        fillOpacity: zone === 'high' ? 0.12 : zone === 'moderate' ? 0.07 : 0.04,
+        weight:      zone === 'high' ? 1.5 : 1,
+        dashArray:   zone === 'low' ? '4 6' : null,
+      }).addTo(map);
+      impactCircles.push(c);
+    });
+ 
+    // Epicenter
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="
+        width:20px;height:20px;
+        background:${levelColor};
+        border:2px solid white;
+        border-radius:50%;
+        box-shadow:0 0 12px ${levelColor},0 0 24px ${levelColor}40;
+        animation:epicenterPulse 1.5s ease-in-out infinite;
+      "></div>`,
+      iconSize: [20,20],
+      iconAnchor: [10,10],
+    });
+ 
+    epicenterMarker = L.marker([lat, lon], { icon })
+      .bindPopup(`
+        <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:#222;">
+          <b>Predicted Epicenter</b><br>
+          Magnitude : <b>${mag.toFixed(2)}</b><br>
+          Lat/Lon   : ${lat.toFixed(4)}° / ${lon.toFixed(4)}°<br>
+          Risk      : <b style="color:${levelColor}">${level}</b>
+        </div>
+      `)
+      .addTo(map);
+ 
+    map.flyTo([lat, lon], Math.min(7, Math.max(3, 8 - mag)), { duration: 1.5 });
+  }
+ 
+  function renderHistory() {
+    const tbody = document.getElementById('history-body');
+    tbody.innerHTML = eventHistory.slice(0,8).map(e => `
+      <tr>
+        <td>${e.time}</td>
+        <td>${e.mag}</td>
+        <td><span class="level-badge ${e.level}">${e.level}</span></td>
+      </tr>
+    `).join('') || '<tr><td colspan="3" style="color:var(--text-dim);text-align:center">No events</td></tr>';
+  }
+ 
+  function loadPredictionsJSON() {
+    const input = document.createElement('input');
+    input.type  = 'file';
+    input.accept = '.json';
+    input.onchange = e => {
+      const file   = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          updateDashboard(data);
+        } catch(err) {
+          alert('Invalid JSON file: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  }
+ 
+  const DEMO_EVENTS = [
+    {
+      trace_name:'demo_high',     is_earthquake:true,  detection_prob:0.992,
+      magnitude:7.1,  latitude:38.32, longitude:142.37, depth_km:29.0,
+      risk_level:'HIGH', alert_active:true,
+      impact_radii:{high:400,moderate:700,low:1200},
+      actions:['DROP, COVER, and HOLD ON immediately',
+               'Evacuate coastal areas (tsunami risk)',
+               'Avoid bridges and overpasses',
+               'Contact emergency services'],
+      timestamp: new Date().toISOString(),
+    },
+    {
+      trace_name:'demo_moderate', is_earthquake:true,  detection_prob:0.967,
+      magnitude:5.3, latitude:34.05, longitude:135.2, depth_km:15.0,
+      risk_level:'MODERATE', alert_active:true,
+      impact_radii:{high:80,moderate:200,low:400},
+      actions:['Move away from windows','Prepare emergency kit','Be ready to evacuate'],
+      timestamp: new Date().toISOString(),
+    },
+    {
+      trace_name:'demo_low',      is_earthquake:true,  detection_prob:0.881,
+      magnitude:3.6, latitude:37.8, longitude:-122.3, depth_km:8.5,
+      risk_level:'LOW', alert_active:false,
+      impact_radii:{high:30,moderate:80,low:200},
+      actions:['Monitor official seismic authority updates','No immediate action required'],
+      timestamp: new Date().toISOString(),
+    },
+  ];
+  let demoIdx = 0;
+ 
+  function loadDemoData() {
+    const data = DEMO_EVENTS[demoIdx % DEMO_EVENTS.length];
+    data.timestamp = new Date().toISOString();
+    demoIdx++;
+    updateDashboard(data);
+  }
+ 
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes epicenterPulse {
+      0%,100% { transform:scale(1);   opacity:1; }
+      50%      { transform:scale(1.4); opacity:0.7; }
+    }
+  `;
+  document.head.appendChild(style);
+ 
+  setTimeout(loadDemoData, 500);
+  </script>
+</body>
+</html>
