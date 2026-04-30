@@ -144,8 +144,8 @@ Power Spectral Density (PSD) extracts frequency-based energy information from se
 ## 1. Clone Repository
 
 ```bash
-git clone https://github.com/Roshh21/EQ-DETECTION.git
-cd EQ-DETECTION
+git clone https://github.com/Roshh21/seismic-event-detection-system.git
+cd seismic-event-detection-system
 ```
 
 ---
